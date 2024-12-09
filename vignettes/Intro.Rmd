@@ -1,0 +1,238 @@
+---
+title: "Intro of final project"
+author: "SA24204166"
+date: "2024-12-09"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Intro of final project}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+```{r}
+library(fpc)
+library(kernlab)
+library(igraph)
+library(Rcpp)
+```
+
+---
+# 背景介绍
+
+  有向图是一种重要的数据结构，它由节点和边组成，其中每条边都有一个方向，从起点指向终点。这种特性使得有向图可以用来表示各种具有方向性的关系，例如网络拓扑、流程控制等。在有向图中寻找最短路径或最优路径是非常常见的应用，这在导航系统中尤为重要，现代搜索引擎和推荐系统经常使用有向图来构建知识图谱，以更好地理解和关联不同实体之间的关系。
+  有向图的聚类目前存在许多方法，本R包旨在复现多种对有向图进行谱聚类的算法。
+  
+  
+# 函数介绍  
+  首先第一个函数是生成一个有向的SBM模型。
+```{r}
+DSBM<-function(k,n,p,q,eta){
+  g <- make_empty_graph(n,directed=TRUE)
+  g1<-matrix(c(0),nrow=n,ncol=n)
+  realPart <- matrix(c(0),nrow=n,ncol=n)
+  imagPart <- matrix(c(0),nrow=n,ncol=n)
+  realPart1 <- matrix(c(0),nrow=n,ncol=n)
+  imagPart1 <- matrix(c(0),nrow=n,ncol=n)
+  realPart2 <- matrix(c(0),nrow=n,ncol=n)
+  imagPart2 <- matrix(c(0),nrow=n,ncol=n)
+  x1<-rep(0,n)
+  # 平均分成十个类
+  membership <- rep(1:n, each = n/10)
+  # 同类中的节点以概论p连边
+  intra_prob <- p
+
+  # 不同类中的节点以概率q连边
+  inter_prob <- q
+  # 添加边
+  h <- 0
+  for (i in 1:n) {
+    for (j in i:n) {
+      if (membership[i] == membership[j]&&i!=j) {
+        if (runif(1) < intra_prob) {
+          if(runif(1)<eta){
+            g <- add_edges(g, c(i, j))
+            g1[i,j]<- 1
+            imagPart[i,j]<- 1
+            imagPart[j,i]<- -1
+            realPart1[i,j]<- cos(ceiling(2*pi*k)/n)
+            imagPart1[i,j]<- sin(ceiling(2*pi*k)/n)
+            realPart1[j,i]<- cos(ceiling(2*pi*k)/n)
+            imagPart1[j,i]<- -sin(ceiling(2*pi*k)/n)
+            x1[i]<- x1[i]+1
+            x1[j]<- x1[j]+1
+          }
+          else{
+            g <- add_edges(g, c(j, i))}
+          g1[j,i]<- 1
+          imagPart[i,j]<- -1
+          imagPart[j,i]<- 1
+          realPart1[i,j]<- cos(ceiling(2*pi*k)/n)
+          imagPart1[i,j]<- -sin(ceiling(2*pi*k)/n)
+          realPart1[j,i]<- cos(ceiling(2*pi*k)/n)
+          imagPart1[j,i]<- sin(ceiling(2*pi*k)/n)
+          x1[i]<- x1[i]+1
+          x1[j]<- x1[j]+1
+        }
+      } else {
+        if (runif(1) < inter_prob&&i!=j) {
+          if(runif(1)<eta){
+            g <- add_edges(g, c(i, j))
+            g1[i,j]<- 1
+            imagPart[i,j]<- 1
+            imagPart[j,i]<- -1
+            realPart1[i,j]<- cos(ceiling(2*pi*k)/n)
+            imagPart1[i,j]<- sin(ceiling(2*pi*k)/n)
+            realPart1[j,i]<- cos(ceiling(2*pi*k)/n)
+            imagPart1[j,i]<- -sin(ceiling(2*pi*k)/n)
+            x1[i]<- x1[i]+1
+            x1[j]<- x1[j]+1
+          }
+          else{
+            g <- add_edges(g, c(j, i))
+            g1[j,i]<- 1
+            imagPart[i,j]<- -1
+            imagPart[j,i]<- 1
+            realPart1[i,j]<- cos(ceiling(2*pi*k)/n)
+            imagPart1[i,j]<- -sin(ceiling(2*pi*k)/n)
+            realPart1[j,i]<- cos(ceiling(2*pi*k)/n)
+            imagPart1[j,i]<- sin(ceiling(2*pi*k)/n)
+            x1[i]<- x1[i]+1
+            x1[j]<- x1[j]+1
+          }
+        }
+      }
+    }
+  }
+  complexMatrix1 <- matrix(data = complex(real=realPart,imaginary =imagPart),nrow=n,ncol=n)
+  complexMatrix2 <- matrix(data = complex(real=realPart1,imaginary =imagPart1),nrow=n,ncol=n)
+  D<- diag(x1)
+  G<- list(g1,g,complexMatrix1,complexMatrix2,D)
+  names(G)<-c("g1","g","cg1","cg2","D")
+  return(G)
+}
+  G<-DSBM(4,100,0.8,0.2,0.5)
+```
+这个函数用于生成一个有k个聚类、n个节点的网络，其中聚类内节点的连边概率为p，聚类间节点的连边概率为q，对每条边有概率$\eta$为正向，函数输出所得到的图的邻接矩阵，对角的节点度数矩阵以及两种形式的hermitian邻接矩阵。下面是复现的有向图聚类算法：第一个是DDSYM算法，是通过对称化邻接矩阵再谱聚类完成的，
+
+```{r}
+DDSYM<-function(k,g1,n) {
+  x<-c(0)
+  A1 <- g1%*%t(g1)+t(g1)%*%g1
+  for(i in 1:n){
+    x[i]<- sum(A1[i,])
+  }
+  D<-diag(x)
+  A2<-diag(rep(1,100))-sqrt(solve(D))%*%A1%*%sqrt(solve(D))
+  D1 <- eigen(A2,symmetric = TRUE)
+  D2<-D1$vectors[,(n-k+1):n]
+  return(kmeans(D2,k))
+  
+}
+DDSYM1<-DDSYM(4,G$g1,100)
+DDSYM1
+```
+第二个是HERM算法,运用了Hermitian矩阵可对角化进而可谱分解的特征，构造了一个Hermitian矩阵
+$$\begin{equation}
+    \omega_{kl} = i ,\omega_{lk} = -i, if \; k,l\; \text{is connected with k to l} \\
+
+\end{equation}$$
+```{r}
+HermRW<- function(k,cg1,D,n){
+  P<-matrix(data=complex(real=rep(0,n*n),imaginary = rep(0,n*n)),nrow=n,ncol=n)
+  A2<-diag(rep(1,n))-sqrt(solve(D))%*%cg1%*%sqrt(solve(D))
+  
+  D1 <- eigen(A2,symmetric = TRUE)
+  for(i in 1:(k/2)){
+  
+  P<- P+D1$vectors[,(n-k+1):n]%*%Conj(t(D1$vectors[,(n-k+1):n]))
+  }
+
+km<- kmeans(cbind(Re(P),Im(P)),k)
+return(km)
+}
+H1<-HermRW(4,G$cg1,G$D,100)
+H1
+```
+第三种谱聚类算法是第二种的改进版本，当存在有向边时将邻接矩阵的值改成大于第$2\pi k$的第一个整数个单位根$\omega_{\lceil 2\pi k \rceil}$
+```{r}
+Simpleherm<- function(k,cg2,D,n){
+  P<-matrix(data=complex(real=rep(0,n*n),imaginary = rep(0,n*n)),nrow=n,ncol=n)
+  A2<-diag(rep(1,n))-sqrt(solve(D))%*%cg2%*%sqrt(solve(D))
+  D1<-eigen(A2)
+  for(i in 1:(k/2)){
+  
+    P<- P+D1$vectors[,(n-k+1):n]%*%Conj(t(D1$vectors[,(n-k+1):n]))
+  }
+km<- kmeans(cbind(Re(P),Im(P)),k)
+return(km)
+}
+H2<-Simpleherm(4,G$cg2,G$D,100)
+H2
+```
+下面是一个评估聚类效果的函数，旨在通过枚举法计算出真实标签与得到的标签的误差值。
+```{Rcpp}
+#include <Rcpp.h>
+using namespace Rcpp;
+// [[Rcpp::export]]
+double ARI( int k,int n ,IntegerVector true_label, IntegerVector label) {
+  NumericMatrix N(k, k);
+  NumericVector a(k);
+  NumericVector b(k);
+  double index = 0;
+  double aei = 0;
+  double bei = 0;
+
+  for (int i = 0; i < n; ++i) {
+    for (int j = 0; j < k; ++j) {
+      for (int l = 0; l < k; ++l) {
+        if (true_label[i] - 1 == j && label[i] - 1 == l) {
+          N(j, l)++;
+        }
+      }
+    }
+  }
+
+  for (int i = 0; i < k; ++i) {
+    a[i] = sum(N(i, _));
+  }
+
+  for (int i = 0; i < k; ++i) {
+    b[i] = sum(N(_, i));
+  }
+
+  for (int i = 0; i < k; ++i) {
+    for (int j = 0; j < k; ++j) {
+      if (N(i, j) > 1) {
+        index += N(i, j) * (N(i, j) - 1) / 2;
+      }
+    }
+  }
+
+  for (int i = 0; i < k; ++i) {
+    if (a[i] > 1) {
+      aei += a[i] * (a[i] - 1) / 2;
+    }
+  }
+
+  for (int i = 0; i < k; ++i) {
+    if (b[i] > 1) {
+      bei += b[i] * (b[i] - 1) / 2;
+    }
+  }
+
+  double ei = aei * bei * 2 / (n * (n - 1));
+  double mri = (aei + bei) / 2;
+  return (index - ei) / (mri - ei);
+}
+
+```
+```{r}
+ARI1<-ARI(4,100,rep(1:4,each=25),H1$cluster)
+ARI1
+ARI2<-ARI(4,100,rep(1:4,each=25),H2$cluster)
+ARI2
+ARI3<-ARI(4,100,rep(1:4,each=25),DDSYM1$cluster)
+ARI3
+plot(c(ARI1,ARI2,ARI3))
+```
+
+  

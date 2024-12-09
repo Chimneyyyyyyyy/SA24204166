@@ -12,8 +12,8 @@
 #' @export
 #' @examples
 #' G=DSBM(4,100,0.8,0.4)
-#' H=different_model(4,G$cg1,G$cg2,G$g1,G$D,100)
-#' ARI(4,100,rep(1:4,each= 25),(H$km1$cluster))
+#' H=DDSYM(4,G$g1,100)
+#' ARI(4,100,rep(1:4,each= 25),(H$cluster))
 #'
 ARI <- function(k, n, true_label, label) {
     .Call('_SA24204166_ARI', PACKAGE = 'SA24204166', k, n, true_label, label)
