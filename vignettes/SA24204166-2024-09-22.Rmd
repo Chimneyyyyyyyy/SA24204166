@@ -1,7 +1,5 @@
 ---
 title: "work2"
-author:
-  - 熊思源
 output: rmarkdown::html_vignette
 vignette: >
   %\VignetteIndexEntry{work2}
