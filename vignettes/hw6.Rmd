@@ -1,0 +1,216 @@
+---
+title: "HW6"
+author:
+  -熊思源SA24204166
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{HW6}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+9.3
+```{r}
+# 设置Metropolis-Hastings采样器的参数
+theta <- 1  # 标准柯西分布的θ参数
+chain_length <- 5000  # 总的链长度
+burn_in <- 1000      # 热身期长度，即要丢弃的样本数
+sample_size <- chain_length - burn_in  # 最终保留的样本数
+
+# 初始化变量
+chain <- numeric(chain_length)
+chain[1] <- 0  # 从0开始采样
+
+# Metropolis-Hastings采样过程
+for (i in 2:chain_length) {
+  proposal <- rnorm(1, chain[i-1], theta)  # 提出新的样本，标准差设为θ
+  acceptance_ratio <- dcauchy(proposal) / dcauchy(chain[i-1])  # 标准柯西分布密度
+  # 确保不会除以0或无穷大
+  if (!is.nan(acceptance_ratio) && !is.infinite(acceptance_ratio)) {
+    if (runif(1) < acceptance_ratio) {
+      chain[i] <- proposal  # 接受提议
+    } else {
+      chain[i] <- chain[i-1]  # 拒绝提议
+    }
+  } else {
+    chain[i] <- chain[i-1]  # 如果计算出现问题，保持当前状态
+  }
+}
+
+# 丢弃热身期的样本
+sampled_chain <- chain[-(1:burn_in)]
+
+# 计算生成的观测值的十分位数
+sampled_deciles <- quantile(sampled_chain, probs = seq(0.1, 0.9, by = 0.1))
+
+# 计算标准柯西分布的十分位数
+true_deciles <- qcauchy(seq(0.1, 0.9, by = 0.1))
+
+# 比较十分位数
+comparison <- data.frame(Decile = seq(0.1, 0.9, by = 0.1),
+                         Sampled = sampled_deciles,
+                         True = true_deciles)
+
+print(comparison)
+
+```
+9.8
+```{r}
+# 吉布斯抽样器函数
+gibbs_sampler <- function(n_iter, n, a, b) {
+  x <- numeric(n_iter)  # 初始化x的样本链
+  y <- numeric(n_iter)  # 初始化y的样本链
+  x[1] <- sample(0:n, 1)  # 随机初始化x
+  y[1] <- runif(1)  # 随机初始化y
+
+  for (i in 2:n_iter) {
+    # 固定y，从Binomial(n, y)抽取x
+    x[i] <- rbinom(1, n, y[i-1])
+    
+    # 固定x，从Beta(x+a, n-x+b)抽取y
+    y[i] <- rbeta(1, x[i] + a, n - x[i] + b)
+  }
+  
+  return(data.frame(x = x, y = y))
+}
+
+# 参数设置
+n_iter <- 10000  # 迭代次数
+n <- 10  # n的值
+a <- 2  # a的值
+b <- 3  # b的值
+
+# 运行吉布斯抽样器
+samples <- gibbs_sampler(n_iter, n, a, b)
+
+samples
+
+```
+9.3*
+```{r}
+# 定义Metropolis-Hastings抽样器的函数
+metropolis_hastings <- function(theta, iterations) {
+  chain <- numeric(iterations)
+  x_current <- 0  # 初始值
+  for (i in 1:iterations) {
+    # 建议新值
+    x_proposal <- rnorm(1, x_current, theta)
+    # 计算接受概率
+    accept_prob <- min(1, dcauchy(x_proposal, 0, 1) / dcauchy(x_current, 0, 1))
+    # 接受或拒绝
+    if (runif(1) < accept_prob) {
+      x_current <- x_proposal
+    }
+    chain[i] <- x_current
+  }
+  return(chain)
+}
+
+# 设置参数和迭代次数
+theta <- 1  # 对于标准柯西分布，theta = 1
+iterations <- 10000  # 总迭代次数
+burn_in <- 1000  # 烧入期
+split <- 2  # 分割段数
+
+# 运行Metropolis-Hastings抽样器
+chain <- metropolis_hastings(theta, iterations)
+
+# 丢弃前1000个样本
+chain <- chain[-(1:burn_in)]
+
+# 确保链的长度可以被分割段数整除
+chain <- chain[1:(length(chain) - (length(chain) %% split))]
+
+# 计算Gelman-Rubin统计量
+gelman_rubin <- function(chain, split=2) {
+  n <- length(chain)
+  m <- n / split
+  chain_splitted <- split(chain, rep(1:split, each=m))
+  B <- m * var(sapply(chain_splitted, mean))
+  W <- mean(sapply(chain_splitted, var))
+  var_between <- ((n - 1) / n) * B + (m / n) * W
+  R_hat <- sqrt(var_between / W)
+  return(R_hat)
+}
+
+# 监控收敛性
+R_hat_value <- gelman_rubin(chain, split)
+while (R_hat_value >= 1.2) {
+  # 增加迭代次数并重新运行抽样器
+  iterations <- iterations + split * 500  # 确保增加的迭代次数是split的倍数
+  new_chain <- metropolis_hastings(theta, split * 500)
+  chain <- c(chain, new_chain)
+  R_hat_value <- gelman_rubin(chain, split)
+}
+
+# 计算生成的观测值的十分位数
+quantiles_chain <- quantile(chain, probs = seq(0.1, 0.9, by = 0.1))
+
+# 计算标准柯西分布的理论十分位数
+quantiles_theory <- qcauchy(seq(0.1, 0.9, by = 0.1), 0, 1)
+
+# 打印结果
+print(quantiles_chain)
+print(quantiles_theory)
+
+# 比较生成的观测值和理论十分位数
+comparison <- data.frame(Quantile = seq(0.1, 0.9, by = 0.1),
+                         Simulated = quantiles_chain,
+                         Theoretical = quantiles_theory)
+print(comparison)
+
+```
+9.8*
+```{r}
+# 定义吉布斯抽样器函数，接受初始值
+gibbs_sampler <- function(n_iter, a, b, n, x_start, y_start) {
+  x <- numeric(n_iter)
+  y <- numeric(n_iter)
+  x[1] <- x_start
+  y[1] <- y_start
+  
+  for (i in 2:n_iter) {
+    y[i] <- rbeta(1, x[i-1] + a, n - x[i-1] + b)
+    x[i] <- rbinom(1, n, y[i])
+  }
+  
+  return(data.frame(x = x, y = y))
+}
+
+# 设置参数
+n_iter <- 10000  # 迭代次数
+a <- 2            # 参数a
+b <- 3            # 参数b
+n <- 10           # 参数n
+n_chains <- 5     # 增加链的数量
+
+# 运行链，使用不同的初始值
+chains <- lapply(1:n_chains, function(chain_id) {
+  x_start <- sample(0:n, 1)  # 不同的初始x值
+  y_start <- rbeta(1, a, b)  # 不同的初始y值
+  gibbs_sampler(n_iter, a, b, n, x_start, y_start)
+})
+
+# 定义Gelman-Rubin统计量计算函数
+gelman_rubin <- function(chains) {
+  m <- length(chains)
+  n <- nrow(chains[[1]])
+  W <- sapply(chains, function(chain) var(chain))
+  B <- n * var(sapply(chains, function(chain) mean(chain)))
+  var_between <- (n - 1) / n * B + (m + 1) / (m * n) * W
+  R <- sqrt(var_between / W)
+  return(R)
+}
+
+# 计算R
+R <- gelman_rubin(lapply(chains, function(chain) chain$x))
+R_y <- gelman_rubin(lapply(chains, function(chain) chain$y))
+
+# 打印R值
+print(R)
+print(R_y)
+
+chains
+
+```
+

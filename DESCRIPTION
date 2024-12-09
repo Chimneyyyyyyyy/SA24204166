@@ -1,0 +1,15 @@
+Package: SA24204166
+Type: Package
+Title: DSBM and some methods
+Version: 1.0
+Date: 2024-12-09
+Author: SA24204166
+Maintainer: SA24204166 <ustcxsy@mail.ustc.edu.cn>
+Description: Generate directed SBM and use different methods to deal with it.
+License: GPL (>= 2)
+Imports: Rcpp ,igraph,fpc(>= 2.2.13), kernlab(>= 0.9.33)
+LinkingTo: Rcpp
+Suggests: knitr, rmarkdown
+VignetteBuilder: knitr
+RoxygenNote: 7.3.2
+Encoding: UTF-8

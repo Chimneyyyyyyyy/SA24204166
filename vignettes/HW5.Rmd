@@ -1,0 +1,183 @@
+---
+title: "hw5"
+author:
+  - SA24204166
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{hw5}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r}
+library(bootstrap)
+attach(scor)
+
+x <- as.matrix(scor)
+n <- nrow(x)
+
+theta.jack <- numeric(n)
+lambda <- eigen(cov(x))$values
+theta.hat <- max(lambda/sum(lambda))
+
+for(i in 1:n){
+    y <- x[-i, ]
+    s <- cov(y)
+    lambda <- eigen(s)$values
+    theta.jack[i] <- max(lambda/sum(lambda))
+}
+
+bias.jack <- (n - 1) * (mean(theta.jack) - theta.hat)
+se.jack <- sqrt((n - 1)/n * sum((theta.jack - mean(theta.jack))^2))
+
+c(theta.hat, bias.jack, se.jack)
+list(est = theta.hat, bias = bias.jack, se = se.jack)
+detach(scor)
+
+detach(package:bootstrap)
+```
+```{r, fig.width=5, fig.height=5}
+library(DAAG, warn.conflict = FALSE)
+attach(ironslag)
+
+seq_values <- seq(10, 40, 0.1)
+par(mfrow = c(2, 2))
+model_linear <- lm(magnetic ~ chemical)
+plot(chemical, magnetic, main = "Linear", pch = 16)
+predicted_linear <- model_linear$coefficients[1] + model_linear$coefficients[2] * seq_values
+lines(seq_values, predicted_linear, lwd = 2)
+
+model_quadratic <- lm(magnetic ~ chemical + I(chemical^2))
+plot(chemical, magnetic, main = "Quadratic", pch = 16)
+predicted_quadratic <- model_quadratic$coefficients[1] + model_quadratic$coefficients[2] * seq_values + model_quadratic$coefficients[3] * seq_values^2
+lines(seq_values, predicted_quadratic, lwd = 2)
+
+model_exponential <- lm(log(magnetic) ~ chemical)
+plot(chemical, magnetic, main = "Exponential", pch = 16)
+predicted_log_exp <- model_exponential$coefficients[1] + model_exponential$coefficients[2] * seq_values
+predicted_exp <- exp(predicted_log_exp)
+lines(seq_values, predicted_exp, lwd = 2)
+
+squared_chemical <- chemical^2
+cubed_chemical <- chemical^3
+model_cubic <- lm(magnetic ~ chemical + squared_chemical + cubed_chemical)
+plot(chemical, magnetic, main = "Cubic", pch = 16)
+predicted_cubic <- model_cubic$coefficients[1] + model_cubic$coefficients[2] * seq_values + model_cubic$coefficients[3] * seq_values^2 + model_cubic$coefficients[4] * seq_values^3
+lines(seq_values, predicted_cubic, lwd = 2)
+
+par(mfrow = c(1, 1))
+adj_r_squared_values <- numeric(4)
+adj_r_squared_values[1] <- summary(model_linear)$adj.r.squared
+adj_r_squared_values[2] <- summary(model_quadratic)$adj.r.squared
+adj_r_squared_values[3] <- summary(model_exponential)$adj.r.squared
+adj_r_squared_values[4] <- summary(model_cubic)$adj.r.squared
+adj_r_squared_values
+
+num_observations <- length(magnetic)
+residuals_linear <- residuals_quadratic <- residuals_exponential <- residuals_cubic <- numeric(num_observations)
+for (index in 1:num_observations) {
+  y_subset <- magnetic[-index]
+  x_subset <- chemical[-index]
+  model_subset_linear <- lm(y_subset ~ x_subset)
+  predicted_subset_linear <- model_subset_linear$coefficients[1] + model_subset_linear$coefficients[2] * chemical[index]
+  residuals_linear[index] <- magnetic[index] - predicted_subset_linear
+  
+  model_subset_quadratic <- lm(y_subset ~ x_subset + I(x_subset^2))
+  predicted_subset_quadratic <- model_subset_quadratic$coefficients[1] + model_subset_quadratic$coefficients[2] * chemical[index] + model_subset_quadratic$coefficients[3] * chemical[index]^2
+  residuals_quadratic[index] <- magnetic[index] - predicted_subset_quadratic
+  
+  model_subset_exponential <- lm(log(y_subset) ~ x_subset)
+  predicted_log_subset_exp <- model_subset_exponential$coefficients[1] + model_subset_exponential$coefficients[2] * chemical[index]
+  predicted_subset_exp <- exp(predicted_log_subset_exp)
+  residuals_exponential[index] <- magnetic[index] - predicted_subset_exp
+  
+  squared_subset_chemical <- x_subset^2
+  cubed_subset_chemical <- x_subset^3
+  model_subset_cubic <- lm(y_subset ~ x_subset + squared_subset_chemical + cubed_subset_chemical)
+  predicted_subset_cubic <- model_subset_cubic$coefficients[1] + model_subset_cubic$coefficients[2] * chemical[index] + model_subset_cubic$coefficients[3] * chemical[index]^2 + model_subset_cubic$coefficients[4] * chemical[index]^3
+  residuals_cubic[index] <- magnetic[index] - predicted_subset_cubic
+}
+c(mean(residuals_linear^2), mean(residuals_quadratic^2), mean(residuals_exponential^2), mean(residuals_cubic^2))
+
+detach(ironslag)
+detach(package:DAAG)
+
+```
+```{r}
+custom_cvm_check <- function(a, b, repetitions = 199) {
+  len_a <- length(a)
+  len_b <- length(b)
+  combined_values <- c(a, b)
+  total_length <- len_a + len_b
+  F_n <- numeric(total_length)
+  G_m <- numeric(total_length)
+  
+  for (j in 1:total_length) {
+    F_n[j] <- mean(as.integer(combined_values[j] <= a))
+    G_m[j] <- mean(as.integer(combined_values[j] <= b))
+  }
+  
+  cvm_initial <- ((len_a * len_b) / total_length) * sum((F_n - G_m)^2)
+  cvm_replicates <- replicate(repetitions, expr = {
+    permutation_indices <- sample(1:total_length)
+    permuted_values <- combined_values[permutation_indices]
+    A_permuted <- permuted_values[1:len_a]
+    B_permuted <- permuted_values[(len_a + 1):total_length]
+    
+    for (j in 1:total_length) {
+      F_n[j] <- mean(as.integer(permuted_values[j] <= A_permuted))
+      G_m[j] <- mean(as.integer(permuted_values[j] <= B_permuted))
+    }
+    
+    ((len_a * len_b) / total_length) * sum((F_n - G_m)^2)
+  })
+  
+  cvm_combined <- c(cvm_replicates, cvm_initial)
+  return(list(test_statistic = cvm_initial, p_value = mean(cvm_combined >= cvm_initial)))
+}
+
+attach(chickwts)
+vec_a <- as.vector(weight[feed == "soybean"])
+vec_b <- as.vector(weight[feed == "linseed"])
+vec_c <- as.vector(weight[feed == "sunflower"])
+detach(chickwts)
+
+custom_cvm_check(vec_a, vec_b)
+custom_cvm_check(vec_c, vec_b)
+
+```
+
+```{r}
+spearman_permutation <- function(vec_x, vec_y) {
+  spearman_test <- cor.test(vec_x, vec_y, method = "spearman")
+  sample_size <- length(vec_x)
+  perm_corrs <- replicate(R_permutations, expr = {
+    perm_indices <- sample(1:sample_size)
+    cor.test(vec_x, vec_y[perm_indices], method = "spearman")$estimate
+  })
+  combined_corrs <- c(spearman_test$estimate, perm_corrs)
+  p_value <- mean(as.integer(spearman_test$estimate <= combined_corrs))
+  return(list(spearman_rho = spearman_test$estimate, p_value = p_value))
+}
+
+library(MASS)
+mean_values <- c(0, 0)
+cov_matrix <- matrix(c(1, 0.5, 0.5, 1), 2, 2)
+sample_size <- 30
+R_permutations <- 499
+data_x <- mvrnorm(sample_size, mean_values, cov_matrix)
+cor.test(data_x[, 1], data_x[, 2], method = "spearman")
+spearman_permutation(data_x[, 1], data_x[, 2])
+
+data_x <- exp(mvrnorm(sample_size, mean_values, cov_matrix))
+cor.test(data_x[, 1], data_x[, 2], method = "spearman")
+spearman_permutation(data_x[, 1], data_x[, 2])
+
+data_x <- exp(mvrnorm(sample_size, mean_values, cov_matrix))
+cor.test(data_x[, 1], data_x[, 2], method = "spearman")
+spearman_permutation(data_x[, 1], data_x[, 2])
+
+detach(package:MASS)
+
+```
+

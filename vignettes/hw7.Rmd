@@ -1,0 +1,125 @@
+---
+title: "hw7"
+author:
+  - SA24204166熊思源
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{hw7}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+11.3
+```{r}
+
+compute_term <- function(k, d, a) {
+  norm_a <- sqrt(sum(a^2))
+  term <- (-1)^k / (gamma(k+1) * 2^k) * gamma((d + 1)/2) * gamma(k + 3/2) / gamma(k + (d + 1)/2 + 1)* (norm_a^(2*k + 2)) / ((2*k + 1) * (2*k + 2))
+  return(term)
+}
+
+compute_sum <- function(d, a) {
+  sum_value <- 0
+  for (k in 0:100) { 
+    term_value <- compute_term(k, d, a)
+    if (is.nan(term_value) || is.infinite(term_value)) {
+      break
+    }
+    sum_value <- sum_value + term_value
+  }
+  return(sum_value)
+}
+
+
+a <- c(1, 2)
+d <- 2
+result <- compute_sum(d, a)
+print(result)
+
+```
+11.5
+```{r}
+k <- 8
+a <- seq(1, sqrt(k)-0.01, length.out = 100)
+y1 <- 1 - pt(sqrt(a^2*(k-1)/(k-a^2)), df = k-1)
+y2 <- 1 - pt(sqrt(a^2*k/(k+1-a^2)), df = k)
+plot(a, y1-y2, type = "l")
+
+f <- function(a, k) {
+  c1 <- sqrt(a^2 * (k - 1)/(k - a^2))
+  c2 <- sqrt(a^2 * k/(k + 1 - a^2))
+  p1 <- pt(c1, df = k - 1, lower.tail = FALSE)
+  p2 <- pt(c2, df = k, lower.tail = FALSE)
+  p1 - p2
+}
+
+K <- c(4:25, 100, 500, 1000)
+n <- length(K)
+r <- numeric(n)
+pr <- numeric(n)
+
+for (i in 1:n) {
+  k <- K[i]
+  u <- uniroot(f, interval = c(1, 2), k = k)
+  r[i] <- u$root
+  pr[i] <- pt(r[i], df = k - 1, lower.tail = FALSE)
+}
+
+result <- cbind(K, r, pr)
+print(result)
+a <- r
+ck <- sqrt(a^2 * K/(K + 1 - a^2))
+cbind(K, a, ck)
+```
+```{r}
+# 使用EM算法估计参数lambda
+set.seed(123)
+y <- c(0.54, 0.48, 0.33, 0.43, 1.00, 1.00, 0.91, 1.00, 0.21, 0.85)
+
+# EM算法迭代次数
+max_iter <- 100
+# 初始猜测的lambda值
+lambda_init <- 1
+# 收敛阈值
+tolerance <- 1e-6
+
+# EM算法函数
+em_algorithm <- function(y, max_iter, lambda_init, tolerance){
+  lambda_old <- lambda_init
+  for(iter in 1:max_iter){
+    # E步：计算每个数据点的期望完整数据对数似然
+    e_step <- pexp(y, rate = lambda_old) * dexp(y, rate = lambda_old)
+    
+    # M步：更新lambda以最大化Q函数
+    m_step <- sum(e_step * y) / sum(e_step)
+    
+    # 检查收敛性
+    if(abs(m_step - lambda_old) < tolerance){
+      break
+    }
+    
+    lambda_old <- m_step
+  }
+  
+  return(list(lambda = lambda_old, iterations = iter))
+}
+
+# 运行EM算法
+result_em <- em_algorithm(y, max_iter, lambda_init, tolerance)
+
+# 打印EM算法的结果
+print(result_em)
+
+# 计算观测数据的最大似然估计(MLE)
+mle_lambda <- mean(y[y <= 1])
+
+# 打印MLE的结果
+print(paste("MLE of lambda:", mle_lambda))
+
+# 比较EM算法的结果与MLE
+comparison <- paste("Comparison between EM and MLE:")
+comparison <- paste(comparison, "\nEM estimate of lambda:", result_em$lambda)
+comparison <- paste(comparison, "\nMLE of lambda:", mle_lambda)
+cat(comparison, "\n")
+
+```
+

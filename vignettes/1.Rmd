@@ -1,0 +1,97 @@
+---
+title: "hw1"
+author: "SA24204166"
+date: "2024-12-09"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{hw1}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+$f(x)=\frac{f(0)}{0!}+\frac{f^{\prime}(0)}{1!}x+\frac{f^{\prime\prime}(0)}{2!}x^2+...+\frac{f^{(n)}(0)}{n!}x^n+R_n(x)$
+
+```{r}
+a<-c(1,2,3,4)
+b<-c(4,5,6,7)
+l<-plot(a,b)
+table(a,b)
+
+```
+
+```{r}
+library(ggplot2)
+library(dplyr)
+library(knitr)
+set.seed(123)
+data <- data.frame(x = rnorm(100),y = rnorm(100))
+
+# 生成图片
+ggplot(data, aes(x, y)) +
+  geom_point() +
+  ggtitle("散点图示例") +
+  theme_minimal()
+
+
+
+table_data <- data.frame(
+  mean_x = mean(data$x),
+  sd_x = sd(data$x),
+  mean_y = mean(data$y),
+  sd_y = sd(data$y)
+)
+
+
+kable(table_data, caption = "统计数据表")
+
+
+cat("均值公式：", "\n")
+cat("E(X) = \\frac{1}{n} \\sum_{i=1}^{n} x_i", "\n")
+cat("标准差公式：", "\n")
+cat("SD(X) = \\sqrt{\\frac{1}{n-1} \\sum_{i=1}^{n} (x_i - E(X))^2}", "\n")
+
+
+```
+
+$$
+E(X) = \frac{1}{n} \sum_{i=1}^{n} x_i
+$$ $$ SD(X) = \sqrt{\frac{1}{n-1} \sum_{i=1}^{n} (x_i - E(X))^2}
+ $$
+
+```{r}
+
+library(ggplot2)
+library(dplyr)
+library(knitr)
+
+set.seed(456)
+data <- data.frame(
+  value = rnorm(200, mean = 50, sd = 15)
+)
+
+hist_plot <- ggplot(data, aes(x = value)) +
+  geom_histogram(binwidth = 5, fill = "blue", color = "black") +
+  ggtitle("直方图示例") +
+  xlab("值") +
+  ylab("频率") +
+  theme_minimal()
+
+hist_plot
+
+desc_stats <- data %>%
+  summarise(
+    Mean = mean(value),
+    Median = median(value),
+    SD = sd(value),
+    Min = min(value),
+    Max = max(value)
+  )
+
+kable(desc_stats, caption = "描述性统计表")
+
+ 
+ 
+
+```
+
+$$f(x) = \frac{1}{\sigma \sqrt{2 \pi}} e^{-\frac{(x - \mu)^2}{2 \sigma^2}} $$

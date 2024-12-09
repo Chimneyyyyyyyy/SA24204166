@@ -1,0 +1,101 @@
+---
+title: "work2"
+author:
+  - 熊思源
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{work2}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+```{r}
+# 设置参数
+sigma <- 1  # Rayleigh分布的尺度参数
+n <- 100  # 你想要生成的随机数的数量
+
+# 生成均匀分布的随机数
+u <- runif(n)
+
+# Rayleigh分布CDF的逆函数
+rayleigh_inv_cdf <- function(u, sigma) {
+  sqrt(-2 * sigma^2 * log(1 - u))
+}
+
+# 应用逆变换法生成Rayleigh分布的随机数
+rayleigh_data <- rayleigh_inv_cdf(u, sigma)
+
+print(rayleigh_data)
+
+# 绘制直方图
+hist(rayleigh_data, breaks = "Sturges", freq = FALSE,
+     main = "Rayleigh分布",
+     xlab = "Value", ylab = "Density",
+     col = "blue", border = "black")
+
+# 添加密度曲线
+lines(density(rayleigh_data), col = "red", lwd = 2)
+
+```
+```{r}
+n <- 1000
+
+# 定义生成混合正态分布样本的函数
+generate_mixture_sample <- function(n, p1) {
+  p2 <- 1 - p1
+  # 生成来自两个正态分布的样本
+  sample1 <- rnorm(n * p1, mean = 0, sd = 1)
+  sample2 <- rnorm(n * p2, mean = 3, sd = 1)
+  # 合并样本并打乱顺序
+  mixture_sample <- c(sample1, sample2)
+  mixture_sample[sample(length(mixture_sample))]
+}
+
+# 定义绘制直方图和密度图的函数
+plot_mixture_distribution <- function(sample, p1) {
+  hist(sample, breaks = "Sturges", freq = FALSE,
+       main = paste(" p1 =", p1),
+       xlab = "Value", ylab = "Density", col = "green", border = "black")
+  # 添加密度曲线
+  lines(density(sample), col = "red", lwd = 2)
+}
+
+# 生成样本并绘制图表
+p1_values <- c(0.25, 0.5, 0.75)  # 设置不同的p1值
+par(mfrow = c(1, length(p1_values)))  # 设置图形布局
+
+for (p1 in p1_values) {
+  sample <- generate_mixture_sample(n, p1)
+  plot_mixture_distribution(sample, p1)
+}
+
+# "当p1接近0.5时，混合分布更可能呈现出双峰形态。"
+
+```
+```{r}
+
+generate_possiongamma<-function(n,t,lambda, alpha,beta){
+  possiongamma<-rep(0,n)
+  for(i in 1:n){
+   x<-rpois(1,t*lambda)
+  for(j  in 1:x){
+    possiongamma[i]<-possiongamma[i]+rgamma(1,alpha,beta)
+  } 
+  }
+  EPG<- sum(possiongamma)/n
+  VARPG<-sum((possiongamma-EPG)^2)/n
+  return(c(EPG,VARPG))
+}
+lambda<-c(1,2,3)
+for(i in 1:3){
+  print(generate_possiongamma(1000,10,lambda[i],1,1))
+   print(c(lambda[i]*10*1,lambda[i]*10*2))
+ 
+}
+alpha<-c(1,2,3)
+  for(i in 1:3){
+  print(generate_possiongamma(1000,10,1,alpha[i],1))
+  print(c(1*10*alpha[i],1*10*alpha[i]*(alpha[i]+1)))
+        
+}
+```
+

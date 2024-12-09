@@ -1,0 +1,85 @@
+---
+title: "HW9"
+author:
+- 熊思源SA24204166
+documentclass: ctexart
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{HW9}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+```{r}
+library(Rcpp)
+library(microbenchmark)
+```
+
+```{r}
+# 吉布斯抽样器函数
+gibbs_sampler1 <- function(n_iter, n, a, b) {
+  x <- numeric(n_iter)  # 初始化x的样本链
+  y <- numeric(n_iter)  # 初始化y的样本链
+  x[1] <- sample(0:n, 1)  # 随机初始化x
+  y[1] <- runif(1)  # 随机初始化y
+
+  for (i in 2:n_iter) {
+    # 固定y，从Binomial(n, y)抽取x
+    x[i] <- rbinom(1, n, y[i-1])
+    
+    # 固定x，从Beta(x+a, n-x+b)抽取y
+    y[i] <- rbeta(1, x[i] + a, n - x[i] + b)
+  }
+  
+  return(data.frame(x = x, y = y))
+}
+
+# 参数设置
+n_iter <- 10000  # 迭代次数
+n <- 10  # n的值
+a <- 2  # a的值
+b <- 3  # b的值
+
+
+```
+
+```{Rcpp}
+#include <Rcpp.h>
+#include <cmath>
+using namespace Rcpp;
+
+// [[Rcpp::export]]
+List gibbs_sampler2(int n, double a, double b, int iterations) {
+  // 初始化变量
+  NumericVector x(iterations);
+  NumericVector y(iterations);
+  x[0] = 0; // 可以从任意初始值开始
+  y[0] = 0.5; // 可以从任意初始值开始
+  
+  // 进行Gibbs抽样
+  for (int i = 1; i < iterations; ++i) {
+    // 根据条件分布Beta(x + a, n - x + b)抽样y
+    double alpha = x[i - 1] + a;
+    double beta = n - x[i - 1] + b;
+    y[i] = R::rbeta(alpha, beta);
+    
+    // 根据条件分布二项分布Binomial(n, y)抽样x
+    x[i] = R::rbinom(n, y[i]);
+  }
+  
+  // 返回结果
+  return List::create(Named("x") = x, Named("y") = y);
+}
+
+```
+```{r}
+samples2<-gibbs_sampler1(10000,2,3,10)
+# 运行吉布斯抽样器
+samples1 <- gibbs_sampler2(10, 2, 3, 10000)
+result <- microbenchmark(
+  gibbs_sampler1(10000,2,3,10),
+   gibbs_sampler2(10, 2, 3, 10000))
+result
+samples1
+qqplot(samples1$y,samples2$y)
+```
+R中和Rcpp中的运行时间相比是Rcpp短很多，但生成的数据精度基本相同
