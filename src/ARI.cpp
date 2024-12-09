@@ -9,10 +9,11 @@ using namespace Rcpp;
 //' @param label the generated label of nodes n x 1 vector
 //' @return the value of adjusted Rand Index
 //' @export
-//' @example
-//' G<- DSBM(4,100,0.8,0.4)
-//' H<-different_model(4,G$cg1,G$cg2,G$g1,G$D,100)
+//' @examples
+//' G=DSBM(4,100,0.8,0.4)
+//' H=different_model(4,G$cg1,G$cg2,G$g1,G$D,100)
 //' ARI(4,100,rep(1:4,each= 25),(H$km1$cluster))
+//'
 // [[Rcpp::export]]
 double ARI( int k,int n ,IntegerVector true_label, IntegerVector label) {
   NumericMatrix N(k, k);
